@@ -1,4 +1,4 @@
-# sof1 windows http helper
+# Soldier Of Fortune 1 windows http map auto-downloader
 Put curl.exe in sof root dir.
 
 Put http2.func in User/sofplus/addons dir.

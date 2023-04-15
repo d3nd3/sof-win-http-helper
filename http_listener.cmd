@@ -2,11 +2,11 @@
 setlocal enabledelayedexpansion
 mode con: cols=67 lines=36
 
-
-echo "Welcome to httpv2 downloader."
-echo "Keep this window open so that it can detect map change."
-echo "And handle downloads for you..."
-rem start "SoF HTTPv2" "SoF.exe"
+echo Welcome to SoF1 HTTP Auto Map Downloader.
+echo Keep this window open so that it can detect map change.
+echo SoF should open automatically now.
+rem launching sof.
+start "SoF" "SoF.exe"
 
 SET TRIGGER=0
 SET http_file=
@@ -20,7 +20,6 @@ IF EXIST %afile% (
 :loop
 IF EXIST %afile% (
     SET TRIGGER=1
-    echo %afile% exists
 ) ELSE ( 
     rem echo %afile% NOT exists
     SET TRIGGER=0
@@ -43,23 +42,17 @@ for /f "usebackq tokens=*" %%a in ("%afile%") do (
     set "http_file=!line:~2,-1!"
 )
 set "http_file=!http_file:.bsp=.zip!"
-
-echo !http_file!
-
 SET errorlevel=
-echo starting download "user/maps/!http_file!" "%http_server%!http_file!"
-
+echo [http_listener.cmd] NEUTRAL: Trying to download "%http_server%!http_file!" to "user/maps/!http_file!"
 curl -gk -f -sS -o "user/maps/!http_file!" "%http_server%!http_file!"
 IF "!errorlevel!"=="0" (
-    echo file "%http_file%" downloaded nicely
+    echo [http_listener.cmd] SUCCESS: "%http_file%" downloaded to "%http_server%!http_file!".
     powershell -command "Expand-Archive -LiteralPath './user/maps/!http_file!' -DestinationPath ./user -Force"
-    echo "hmmm"
     set "http_file=!http_file:/=\!"
-    echo "!http_file!"
     del ".\user\maps\!http_file!"
     del "%afile%"
 ) ELSE (
-    echo Curl failed with error !errorlevel!
+    echo [http_listener.cmd] ERROR: Curl failed with error !errorlevel!
     GOTO theend
 )
 GOTO sleep

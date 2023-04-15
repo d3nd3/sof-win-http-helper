@@ -44,7 +44,7 @@ for /f "usebackq tokens=*" %%a in ("%afile%") do (
 set "http_file=!http_file:.bsp=.zip!"
 SET errorlevel=
 echo [http_listener.cmd] NEUTRAL: Trying to download "%http_server%!http_file!" to "user/maps/!http_file!"
-curl -gk -f -sS -o "user/maps/!http_file!" "%http_server%!http_file!"
+curl -gk -f -sS -o "user/maps/!http_file!" --create-dirs "%http_server%!http_file!"
 IF "!errorlevel!"=="0" (
     echo [http_listener.cmd] SUCCESS: "%http_file%" downloaded to "%http_server%!http_file!".
     powershell -command "Expand-Archive -LiteralPath './user/maps/!http_file!' -DestinationPath ./user -Force"

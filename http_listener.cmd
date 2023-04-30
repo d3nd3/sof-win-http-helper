@@ -1,1 +1,0 @@
-powershell.exe -ExecutionPolicy Bypass -File "http_listener.ps1"

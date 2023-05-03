@@ -15,7 +15,7 @@ Write-Host 'Keep this window open so that it can detect map change.'
 Write-Host 'SoF should open automatically now.'
 
 # Launch SoF
-$gameProcess = Start-Process -FilePath 'SoF.exe' -ArgumentList "+set console 1"
+$gameProcess = Start-Process -PassThru -FilePath 'SoF.exe' -ArgumentList "+set console 1"
 
 While ($true) {
 	If (Test-Path $AFile) {
@@ -62,7 +62,8 @@ While ($true) {
 	# Wait for 2 seconds and check again
 	Start-Sleep -Seconds 2
 
-	if (!$gameProcess.HasExited) {
+	if ($gameProcess.HasExited) {
 		exit
 	}
+
 }

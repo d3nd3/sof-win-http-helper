@@ -1,3 +1,5 @@
+if ( $args -contains "disappear" ) {
+
 $ErrorActionPreference = 'Stop'
 
 $HttpFile = ''
@@ -66,4 +68,8 @@ While ($true) {
 		exit
 	}
 
+}
+} else {
+	$arguments = "-WindowStyle Hidden", "-File", $MyInvocation.MyCommand.Path, "disappear"
+	Start-Process "powershell.exe" -ArgumentList $arguments
 }

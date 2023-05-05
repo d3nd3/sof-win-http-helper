@@ -70,6 +70,6 @@ While ($true) {
 
 }
 } else {
-	$arguments = "-WindowStyle Hidden", "-File", $MyInvocation.MyCommand.Path, "disappear"
+	$arguments = "-WindowStyle Hidden", "-File", $PSCommandPath, "disappear"
 	Start-Process "powershell.exe" -ArgumentList $arguments
 }

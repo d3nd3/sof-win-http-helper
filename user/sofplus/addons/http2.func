@@ -26,7 +26,7 @@ function http2_init()
 
 function http2_init_print()
 {
-	echo "HTTP Downloader v1.1 Loaded"
+	echo "HTTP Downloader v1.2 Loaded"
 }
 
 function http2_spawn_dl()

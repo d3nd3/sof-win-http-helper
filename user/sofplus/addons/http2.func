@@ -26,7 +26,7 @@ function http2_init()
 
 function http2_init_print()
 {
-	echo "HTTP Downloader v1.2 Loaded"
+	echo "HTTP Downloader v1.3 Loaded"
 }
 
 function http2_spawn_dl()
@@ -55,7 +55,7 @@ function http2_spawn_dl()
 	else
 	{
 		// We have duration of configstrings to download map ( should freeze here possibly )
-		sp_sc_cvar_sset ~text "Downloading : " #_http2_mapname ".zip"
+		sp_sc_cvar_sset ~text "[HTTP] Checking repo for " #_http2_mapname ".zip"
 		echo #~text
 		sp_sc_cvar_save http_tmp ~full_path
 	}
@@ -119,6 +119,8 @@ function http2_dl_filename(*)
 	// Time is up! The server is ready for slow downloads
 	sp_sc_cvar_copy ~val #~1
 	//echo "DL FILENAME == " #~val
+	sp_sc_cvar_sset ~text "[HTTP] Map " #_http2_mapname ".zip not in repo"
+	echo #~text
 }
 
 // 1-Not connected

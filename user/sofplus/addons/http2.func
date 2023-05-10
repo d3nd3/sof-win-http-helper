@@ -1,126 +1,24 @@
 function http2_init()
 {
-	//spf_sc_list_add_cmd( ~par_cvar_name, ~par_item );
-	//spf_sc_list_add_func( ~par_cvar_name, ~par_item ),
-
+	// disconnecting/reconnecting
 	sp_sc_func_exec spf_sc_list_onchange_add_func _sp_cl_info_state http2_state_change
-
-	//sp_sc_func_exec spf_sc_list_onchange_add_func cl_downloading http2_dl_active
-
+	// connecting to server
+	sp_sc_func_exec spf_sc_list_onchange_add_func _sp_cl_on_connect http2_on_connect
+	// udp downloads begin
 	sp_sc_func_exec spf_sc_list_onchange_add_func cl_download_filename http2_dl_filename
 
-	//sp_sc_func_exec spf_sc_list_onchange_add_func cl_download_percent http2_dl_percent
-
-
-	sp_sc_func_exec spf_sc_list_add_func _sp_cl_on_connect http2_on_connect
-
-	//sp_sc_func_exec spf_sc_list_onchange_add_func _sp_cl_print_data http2_on_status
-
 	zero _http2_mapname
-	set _http2_thread_running 0
 	set _http2_mapname_prev_conn ""
 	set _http2_timer 0
+	set _http2_not_exist_local 0
+	set _http2_thread_ids 0
 
 	sp_sc_timer 250 "sp_sc_func_exec http2_init_print"
 }
 
 function http2_init_print()
 {
-	echo "HTTP Downloader v1.3 Loaded"
-}
-
-function http2_spawn_dl()
-{
-	sp_sc_cvar_copy _http2_mapname _sp_cl_info_map
-
-	//echo "MAP CHANGE == " $_http2_mapname
-
-	// It always returns stale values, so compare it to this stale value from prev connection.
-	// ISSUE: When lastConnection has same Map, it won't download. Because it thinks its early value.
-	// When it might not be early value.
-	sp_sc_cvar_copy _http2_mapname_prev_conn _sp_cl_info_map
-	// Stop this thread, we have got the mapname we needed. Only a new connect creates new thread.
-	set _http2_thread_running 0
-
-	// Begin download.
-
-	sp_sc_cvar_append ~full_path #_http2_mapname ".bsp"
-	//echo " FULL MAPNAME " #~full_path
-	sp_sc_file_find ~found maps/$~full_path file
-
-	sp_sc_flow_if text cvar ~found_0 == val "1"
-	{
-		//echo " MAP ALREADY DOWNLOADED"
-	}
-	else
-	{
-		// We have duration of configstrings to download map ( should freeze here possibly )
-		sp_sc_cvar_sset ~text "[HTTP] Checking repo for " #_http2_mapname ".zip"
-		echo #~text
-		sp_sc_cvar_save http_tmp ~full_path
-	}
-}
-// Pros: Works even on linux server because doesn't depend on serverstatus
-// A loop to get the mapname spamming sp_cl_info_map
-function http2_fast_loop()
-{
-	sp_cl_info_map
-	// it seems its only empty when the game is first opened.
-	// it will always return the last/current map.
-	// difficult to tell when its fresh data.
-	// load our own map to give a comparison from.
-	
-	// Careful because it can be "", ignore empty case.
-	sp_sc_flow_if text cvar _sp_cl_info_map != cvar _http2_mapname_prev_conn
-	{
-		sp_sc_flow_if text cvar _sp_cl_info_map != val ""
-		{
-			sp_sc_func_exec http2_spawn_dl
-		}
-	}
-	else
-	{
-		// Assume its the same map after all if X time has passed.
-		sp_sc_flow_if number cvar _http2_timer > val 5000
-		{
-			sp_sc_flow_if text cvar _sp_cl_info_map != val ""
-			{
-				//echo "Timeout assume same mapname"
-				sp_sc_func_exec http2_spawn_dl
-			}
-		}
-	}
-
-	// Keep running this until we are spawned.
-	sp_sc_flow_if text cvar _http2_thread_running == val 1
-	{
-		add _http2_timer 100
-		sp_sc_timer 100 "sp_sc_func_exec http2_fast_loop"
-	}
-}
-
-
-function http2_on_connect()
-{
-	// Never start a thread that is already running.
-	// to stop the thread : _http2_thread_running 0
-	sp_sc_flow_if text cvar _http2_thread_running == val 0
-	{
-		set _http2_timer 0
-		//echo " START CONNECT GETTING MAP NAME"
-		set _http2_thread_running 1
-		sp_sc_func_exec http2_fast_loop
-	}
-	
-}
-// used for realizing we out of time
-function http2_dl_filename(*)
-{
-	// Time is up! The server is ready for slow downloads
-	sp_sc_cvar_copy ~val #~1
-	//echo "DL FILENAME == " #~val
-	sp_sc_cvar_sset ~text "[HTTP] Map " #_http2_mapname ".zip not in repo"
-	echo #~text
+	echo "[HTTP] Version v1.4 Loaded"
 }
 
 // 1-Not connected
@@ -143,79 +41,142 @@ function http2_state_change(*)
 	// fully connected
 	sp_sc_flow_if text cvar ~val == val 8
 	{
-		set _http2_thread_running 0
+		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
+		{
+			// It doesn't request .bsp file thus download succeeded.
+			sp_sc_cvar_sset ~text "[HTTP] " #_http2_mapname ".zip was downloaded."
+			echo #~text
+			set _http2_not_exist_local 0
+		}
+		sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
 	}
 	else
 	{
 		// fully disconnected
 		sp_sc_flow_if text cvar ~val == val 1
 		{
-			set _http2_thread_running 0
+			sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
 		}
 	}
-	
-	//echo "CONNECTED STATE == " $~val
-}
-//not used
-function http2_dl_active(*)
-{
-	sp_sc_cvar_copy ~val #~1
-	//echo "DL ACTIVE == " #~val
-}
-//not used
-function http2_dl_percent(*)
-{
-	sp_sc_cvar_copy ~val #~1
-	//echo "DL PERCENT == " #~val
 }
 
-function http2_on_connect_deprecated()
+function http2_on_connect()
 {
-	//echo " START CONNECT " #~1 #~2 #~3
-	// enable hidden parsing
-	set _sp_cl_print 3
-	sp_sc_cvar_append ~cmd "serverstatus " #_sp_cl_info_server
-	sp_sc_timer 1 #~cmd
-}
 
-// on unconnected packet response
-// This method is deprecated. But viable. SoF Linux does not return mapname in status response.
-// To make this method work, serverstatus has to be triggered by reconnect (state==4), not on_connect_event.
-// If cl_download_filename contains informaiton, you've ran out of time. should reconnect
-function http2_on_status(*)
-{
-	// disable parsing
-	set _sp_cl_print 0
+	set _http2_timer 0
+	set _http2_not_exist_local 0
 
-	//echo " DATA1 " #_sp_cl_print_data
-
-	sp_sc_cvar_split ~split "\" _sp_cl_print_data
-
-	sp_sc_flow_while number cvar ~i < val #~split_0
+	//Only bounce between 1 and 3
+	add _http2_thread_ids 1
+	sp_sc_flow_if number cvar _http2_thread_ids > val 3
 	{
-		sp_sc_flow_if text cvar ~split_$~i == val "mapname"
+		set _http2_thread_ids 1
+	}
+	sp_sc_func_exec http2_fast_loop $_http2_thread_ids "start"
+}
+
+// Pros: Works even on linux server because doesn't depend on serverstatus
+// A loop to get the mapname spamming sp_cl_info_map
+function http2_fast_loop(~thread_id, ~mode)
+{
+	set ~thread _http2_thread_ids_$~thread_id
+	sp_sc_flow_if text cvar ~mode == val "start"
+	{
+		//echo START
+		set $~thread 1
+		set ~mode "cont"
+	}
+	sp_sc_flow_if text cvar ~mode == val "stop"
+	{
+		//echo STOP
+		sp_sc_flow_if text cvar $~thread == val 1
 		{
-			add ~i 1
-			sp_sc_flow_if text cvar _http2_mapname == val ""
-			{
-				sp_sc_cvar_copy _http2_mapname ~split_$~i
-			}
-			
+			set $~thread 0
 		}
-		add ~i 1
 	}
-	sp_sc_cvar_append ~full_path #_http2_mapname ".bsp"
-	//echo " FULL MAPNAME " #~full_path
-	sp_sc_file_find ~found #~full_path file
-
-	sp_sc_flow_if text cvar ~found_0 == val "1"
+	sp_sc_flow_if text cvar ~mode == val "cont"
 	{
-		//echo " MAP ALREADY DOWNLOADED"
+		//echo CONT
+		// Thread guaranteed to die.
+		sp_sc_flow_if text cvar $~thread == val 1
+		{
+			// returns the value from previous map until a special moment.
+			sp_cl_info_map
+
+			sp_sc_flow_if text cvar _sp_cl_info_map != cvar _http2_mapname_prev_conn
+			{
+				sp_sc_flow_if text cvar _sp_cl_info_map != val ""
+				{
+					//echo Map variable appears at : $_http2_timer
+					sp_sc_func_exec http2_spawn_dl $~thread_id
+				}
+			}
+			else
+			{
+				// Assume its the same map after all if X [1500-2100] time has passed.
+				sp_sc_flow_if number cvar _http2_timer > val 3500
+				{
+					sp_sc_flow_if text cvar _sp_cl_info_map != val ""
+					{
+						sp_sc_func_exec http2_spawn_dl $~thread_id
+					}
+				}
+			}
+
+			add _http2_timer 100
+			sset ~cmd sp_sc_func_exec http2_fast_loop $~thread_id "cont"
+			sp_sc_timer 100 #~cmd
+		}
+	}
+}
+
+function http2_spawn_dl(~thread_id)
+{
+	sp_sc_cvar_copy _http2_mapname _sp_cl_info_map
+
+	sp_sc_cvar_copy _http2_mapname_prev_conn _sp_cl_info_map
+	// Stop this thread, we have got the mapname we needed. Only a new connect creates new thread.
+	sp_sc_func_exec http2_fast_loop $~thread_id "stop"
+
+	// Begin download.
+	sp_sc_cvar_append ~full_path #_http2_mapname ".bsp"
+
+	sp_sc_file_find ~found maps/$~full_path file
+	sp_sc_flow_if text cvar ~found_0 == val "0"
+	{
+		// We have duration of configstrings to download map ( should freeze here possibly )
+		set _http2_not_exist_local 1
+		sp_sc_cvar_sset ~text "[HTTP] Checking repo for " #_http2_mapname ".zip"
+		echo #~text
+		sp_sc_cvar_save http_tmp ~full_path
+	}
+}
+
+// udp downloads begin
+// assumption: 1 bsp file per connect
+function http2_dl_filename(*)
+{
+	// Time is up! The server is ready for slow downloads
+	sp_sc_cvar_copy ~filename #~1
+	sp_sc_cvar_split ~split "." ~filename
+	//last item
+	sp_sc_cvar_copy ~ext ~split_$~split_0
+	sp_sc_flow_if text cvar ~ext == val "bsp"
+	{
+		// Bsp is always downloaded first, so indicates map wasn't in repo. (ignores .sp and extras)
+		// Or the time it took to http download was too long. ( rare case. )
+		sp_sc_cvar_sset ~text "[HTTP] Map " #_http2_mapname ".zip _probably_ not in repo"
+		echo #~text
 	}
 	else
 	{
-		// We have duration of configstrings to download map ( should freeze here possibly )
-		//echo " DOWNLOADING MAP!"
+		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
+		{
+			// It doesn't request .bsp file thus download succeeded.
+			sp_sc_cvar_sset ~text "[HTTP] " #_http2_mapname ".zip was downloaded."
+			echo #~text
+			set _http2_not_exist_local 0
+		}
+		
 	}
-
 }

@@ -1,26 +1,26 @@
+//connect->fast_loop->spawn_dl->cvar_save:http_tmp
 function http2_init()
 {
-	// disconnecting/reconnecting
+	// connecting/disconnecting/reconnecting
 	sp_sc_func_exec spf_sc_list_onchange_add_func _sp_cl_info_state http2_state_change
-	// connecting to server
-	sp_sc_func_exec spf_sc_list_onchange_add_func _sp_cl_on_connect http2_on_connect
+
 	// udp downloads begin
 	sp_sc_func_exec spf_sc_list_onchange_add_func cl_download_filename http2_dl_filename
 
-	zero _http2_mapname
-	set _http2_mapname_prev_conn ""
 	set _http2_timer 0
 	set _http2_not_exist_local 0
 	set _http2_thread_ids 0
+	set _http2_out_in 1
 
 	sp_sc_timer 250 "sp_sc_func_exec http2_init_print"
 }
 
 function http2_init_print()
 {
-	echo "[HTTP] Version v1.4 Loaded"
+	echo "[HTTP] Version v1.5 Loaded"
 }
 
+//2 -> 4 -> 7 -> 8
 // 1-Not connected
 // 2-Attempting to connect to a server
 // 4-(Re)connecting to a server
@@ -30,45 +30,66 @@ function http2_init_print()
 // we entered the game, stop the thread loop
 function http2_state_change(*)
 {
-	sp_sc_cvar_copy ~val #~1
-	sp_sc_flow_if text cvar ~val == val 4
+	sp_sc_cvar_copy ~state #~1
+	//echo state is $~state
+	// fully disconnected
+	sp_sc_flow_if text cvar ~state == val 1
 	{
-		//reconnect from which state, matters.
-		set _http2_timer 0
+		sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
+		set _http2_out_in 1
+	}
+	// Attempting Connect...
+	sp_sc_flow_if text cvar ~state == val 2
+	{
+		//echo "state 2"
+		sp_cl_info_map
+		//echo HMM: $_sp_cl_info_map	
+	}
+	// Reconnecting..
+	sp_sc_flow_if text cvar ~state == val 4
+	{
+		//echo "state 4"
+		sp_cl_info_map
+		//echo HMM: $_sp_cl_info_map
+		sp_sc_flow_if text cvar _http2_out_in == val 0
+		{
+			// This resets _sp_cl_info_map to ""
+			set _http2_out_in 1
+			disconnect
+			reconnect
+		}	
+	}
+	// Connecting..
+	sp_sc_flow_if text cvar ~state == val 7
+	{
+		//echo "State 7"
+		
 		sp_sc_func_exec http2_on_connect
 	}
 
 	// fully connected
-	sp_sc_flow_if text cvar ~val == val 8
+	sp_sc_flow_if text cvar ~state == val 8
 	{
 		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
 		{
 			// It doesn't request .bsp file thus download succeeded.
-			sp_sc_cvar_sset ~text "[HTTP] " #_http2_mapname ".zip was downloaded."
+			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
 			echo #~text
-			set _http2_not_exist_local 0
 		}
 		sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
 	}
-	else
-	{
-		// fully disconnected
-		sp_sc_flow_if text cvar ~val == val 1
-		{
-			sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
-		}
-	}
 }
-
+// State == 7
 function http2_on_connect()
 {
-
+	//echo ON CONNECT
+	set _http2_out_in 0
 	set _http2_timer 0
 	set _http2_not_exist_local 0
 
-	//Only bounce between 1 and 3
+	//Only bounce between 1 and 5
 	add _http2_thread_ids 1
-	sp_sc_flow_if number cvar _http2_thread_ids > val 3
+	sp_sc_flow_if number cvar _http2_thread_ids > val 5
 	{
 		set _http2_thread_ids 1
 	}
@@ -89,10 +110,7 @@ function http2_fast_loop(~thread_id, ~mode)
 	sp_sc_flow_if text cvar ~mode == val "stop"
 	{
 		//echo STOP
-		sp_sc_flow_if text cvar $~thread == val 1
-		{
-			set $~thread 0
-		}
+		set $~thread 0
 	}
 	sp_sc_flow_if text cvar ~mode == val "cont"
 	{
@@ -100,53 +118,37 @@ function http2_fast_loop(~thread_id, ~mode)
 		// Thread guaranteed to die.
 		sp_sc_flow_if text cvar $~thread == val 1
 		{
-			// returns the value from previous map until a special moment.
+			
+			// is empty for a few frames before. perfect.
 			sp_cl_info_map
-
-			sp_sc_flow_if text cvar _sp_cl_info_map != cvar _http2_mapname_prev_conn
+			//echo MAP : $_sp_cl_info_map
+			sp_sc_flow_if text cvar _sp_cl_info_map != val ""
 			{
-				sp_sc_flow_if text cvar _sp_cl_info_map != val ""
-				{
-					//echo Map variable appears at : $_http2_timer
-					sp_sc_func_exec http2_spawn_dl $~thread_id
-				}
+				//echo Map variable appears at : $_http2_timer
+				//echo Map is $_sp_cl_info_map
+				sp_sc_func_exec http2_spawn_dl $~thread_id
 			}
-			else
-			{
-				// Assume its the same map after all if X [1500-2100] time has passed.
-				sp_sc_flow_if number cvar _http2_timer > val 3500
-				{
-					sp_sc_flow_if text cvar _sp_cl_info_map != val ""
-					{
-						sp_sc_func_exec http2_spawn_dl $~thread_id
-					}
-				}
-			}
-
 			add _http2_timer 100
 			sset ~cmd sp_sc_func_exec http2_fast_loop $~thread_id "cont"
 			sp_sc_timer 100 #~cmd
 		}
 	}
 }
-
+// Called by fast_loop if mapname seemed to change.
 function http2_spawn_dl(~thread_id)
 {
-	sp_sc_cvar_copy _http2_mapname _sp_cl_info_map
-
-	sp_sc_cvar_copy _http2_mapname_prev_conn _sp_cl_info_map
 	// Stop this thread, we have got the mapname we needed. Only a new connect creates new thread.
 	sp_sc_func_exec http2_fast_loop $~thread_id "stop"
 
 	// Begin download.
-	sp_sc_cvar_append ~full_path #_http2_mapname ".bsp"
+	sp_sc_cvar_append ~full_path #_sp_cl_info_map ".bsp"
 
 	sp_sc_file_find ~found maps/$~full_path file
 	sp_sc_flow_if text cvar ~found_0 == val "0"
 	{
 		// We have duration of configstrings to download map ( should freeze here possibly )
 		set _http2_not_exist_local 1
-		sp_sc_cvar_sset ~text "[HTTP] Checking repo for " #_http2_mapname ".zip"
+		sp_sc_cvar_sset ~text "[HTTP] Checking repo for " #_sp_cl_info_map ".zip"
 		echo #~text
 		sp_sc_cvar_save http_tmp ~full_path
 	}
@@ -165,7 +167,7 @@ function http2_dl_filename(*)
 	{
 		// Bsp is always downloaded first, so indicates map wasn't in repo. (ignores .sp and extras)
 		// Or the time it took to http download was too long. ( rare case. )
-		sp_sc_cvar_sset ~text "[HTTP] Map " #_http2_mapname ".zip _probably_ not in repo"
+		sp_sc_cvar_sset ~text "[HTTP] Map " #_sp_cl_info_map ".zip _probably_ not in repo"
 		echo #~text
 	}
 	else
@@ -173,7 +175,7 @@ function http2_dl_filename(*)
 		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
 		{
 			// It doesn't request .bsp file thus download succeeded.
-			sp_sc_cvar_sset ~text "[HTTP] " #_http2_mapname ".zip was downloaded."
+			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
 			echo #~text
 			set _http2_not_exist_local 0
 		}

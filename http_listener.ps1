@@ -44,7 +44,9 @@ While ($true) {
 
         try {
             $ProgressPreference = 'SilentlyContinue'
-            Invoke-WebRequest -Uri "$HttpServer$HttpFile" -OutFile $DestFile -ErrorAction Stop
+            $encodedUri = [System.Uri]::EscapeUriString("$HttpServer$HttpFile")
+            $webClient = New-Object System.Net.WebClient
+            $webClient.DownloadFile($encodedUri, $DestFile)
             Write-Host "SUCCESS: ""$HttpFile"" downloaded to ""$DestFile""."
 
             # Read-Host -Prompt "Press Enter to continue..."
@@ -71,7 +73,11 @@ While ($true) {
 
 }
 } else {
-    # $arguments = "-ExecutionPolicy Bypass", "-File `"$PSCommandPath`"", "disappear", "$args"
-    $arguments = "-WindowStyle Hidden","-ExecutionPolicy Bypass", "-File `"$PSCommandPath`"", "disappear", "$args"
+    # $arguments = "-ExecutionPolicy Bypass", "-File `"$PSCommandPath`"", "disappear"
+    $arguments = "-WindowStyle Hidden","-ExecutionPolicy Bypass", "-File `"$PSCommandPath`"", "disappear"
+
+    if ($args -ne $null) {
+        $arguments += $args
+    }
     Start-Process "powershell.exe" -ArgumentList $arguments
 }

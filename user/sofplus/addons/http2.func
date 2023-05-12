@@ -17,7 +17,7 @@ function http2_init()
 
 function http2_init_print()
 {
-	echo "[HTTP] Version v1.6 Loaded"
+	echo "[HTTP] Version v1.7 Loaded"
 }
 
 //2 -> 4 -> 7 -> 8
@@ -73,7 +73,7 @@ function http2_state_change(*)
 		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
 		{
 			// It doesn't request .bsp file thus download succeeded.
-			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
+			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
 			echo #~text
 		}
 		sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
@@ -148,7 +148,7 @@ function http2_spawn_dl(~thread_id)
 	{
 		// We have duration of configstrings to download map ( should freeze here possibly )
 		set _http2_not_exist_local 1
-		sp_sc_cvar_sset ~text "[HTTP] Checking repo for " #_sp_cl_info_map ".zip"
+		sp_sc_cvar_sset ~text "[HTTP] Checking repo for " #_sp_cl_info_map ".zip"
 		echo #~text
 		sp_sc_cvar_save http_tmp ~full_path
 	}
@@ -163,22 +163,23 @@ function http2_dl_filename(*)
 	sp_sc_cvar_split ~split "." ~filename
 	//last item
 	sp_sc_cvar_copy ~ext ~split_$~split_0
-	sp_sc_flow_if text cvar ~ext == val "bsp"
+	sp_sc_flow_if text cvar _http2_not_exist_local == val 1
 	{
-		// Bsp is always downloaded first, so indicates map wasn't in repo. (ignores .sp and extras)
-		// Or the time it took to http download was too long. ( rare case. )
-		sp_sc_cvar_sset ~text "[HTTP] Map " #_sp_cl_info_map ".zip _probably_ not in repo"
-		echo #~text
-	}
-	else
-	{
-		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
+		sp_sc_flow_if text cvar ~ext == val "bsp"
+		{
+			// Bsp is always downloaded first, so indicates map wasn't in repo. (ignores .sp and extras)
+			// Or the time it took to http download was too long. ( rare case. )
+			sp_sc_cvar_sset ~text "[HTTP] Map " #_sp_cl_info_map ".zip _probably_ not in repo"
+			echo #~text
+		}
+		else
 		{
 			// It doesn't request .bsp file thus download succeeded.
-			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
+			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
 			echo #~text
-			set _http2_not_exist_local 0
 		}
-		
+		// Only triggers once.
+		set _http2_not_exist_local 0	
 	}
+	
 }

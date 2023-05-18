@@ -12,12 +12,14 @@ function http2_init()
 	set _http2_thread_ids 0
 	set _http2_out_in 1
 
+	set _http2_enabled 1
+
 	sp_sc_timer 250 "sp_sc_func_exec http2_init_print"
 }
 
 function http2_init_print()
 {
-	echo "[HTTP] Version v1.7 Loaded"
+	echo "[HTTP] Version v1.8 Loaded"
 }
 
 //2 -> 4 -> 7 -> 8
@@ -30,53 +32,59 @@ function http2_init_print()
 // we entered the game, stop the thread loop
 function http2_state_change(*)
 {
-	sp_sc_cvar_copy ~state #~1
-	//echo state is $~state
-	// fully disconnected
-	sp_sc_flow_if text cvar ~state == val 1
+	sp_sc_flow_if number cvar _http2_enabled == val 1
 	{
-		sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
-		set _http2_out_in 1
-	}
-	// Attempting Connect...
-	sp_sc_flow_if text cvar ~state == val 2
-	{
-		//echo "state 2"
-		sp_cl_info_map
-		//echo HMM: $_sp_cl_info_map	
-	}
-	// Reconnecting..
-	sp_sc_flow_if text cvar ~state == val 4
-	{
-		//echo "state 4"
-		sp_cl_info_map
-		//echo HMM: $_sp_cl_info_map
-		sp_sc_flow_if text cvar _http2_out_in == val 0
+		sp_sc_flow_if text cvar _sp_cl_info_server != val "localhost"
 		{
-			// This resets _sp_cl_info_map to ""
-			set _http2_out_in 1
-			disconnect
-			reconnect
-		}	
-	}
-	// Connecting..
-	sp_sc_flow_if text cvar ~state == val 7
-	{
-		//echo "State 7"
-		
-		sp_sc_func_exec http2_on_connect
-	}
+			sp_sc_cvar_copy ~state #~1
+			//echo state is $~state
+			// fully disconnected
+			sp_sc_flow_if text cvar ~state == val 1
+			{
+				sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
+				set _http2_out_in 1
+			}
+			// Attempting Connect...
+			sp_sc_flow_if text cvar ~state == val 2
+			{
+				//echo "state 2"
+				sp_cl_info_map
+				//echo HMM: $_sp_cl_info_map	
+			}
+			// Reconnecting..
+			sp_sc_flow_if text cvar ~state == val 4
+			{
+				//echo "state 4"
+				sp_cl_info_map
+				//echo HMM: $_sp_cl_info_map
+				sp_sc_flow_if text cvar _http2_out_in == val 0
+				{
+					// This resets _sp_cl_info_map to ""
+					set _http2_out_in 1
+					disconnect
+					reconnect
+				}	
+			}
+			// Connecting..
+			sp_sc_flow_if text cvar ~state == val 7
+			{
+				//echo "State 7"
+				
+				sp_sc_func_exec http2_on_connect
+			}
 
-	// fully connected
-	sp_sc_flow_if text cvar ~state == val 8
-	{
-		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
-		{
-			// It doesn't request .bsp file thus download succeeded.
-			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
-			echo #~text
+			// fully connected
+			sp_sc_flow_if text cvar ~state == val 8
+			{
+				sp_sc_flow_if text cvar _http2_not_exist_local == val 1
+				{
+					// It doesn't request .bsp file thus download succeeded.
+					sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
+					echo #~text
+				}
+				sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
+			}
 		}
-		sp_sc_func_exec http2_fast_loop $_http2_thread_ids "stop"
 	}
 }
 // State == 7
@@ -158,28 +166,31 @@ function http2_spawn_dl(~thread_id)
 // assumption: 1 bsp file per connect
 function http2_dl_filename(*)
 {
-	// Time is up! The server is ready for slow downloads
-	sp_sc_cvar_copy ~filename #~1
-	sp_sc_cvar_split ~split "." ~filename
-	//last item
-	sp_sc_cvar_copy ~ext ~split_$~split_0
-	sp_sc_flow_if text cvar _http2_not_exist_local == val 1
+	sp_sc_flow_if number cvar _http2_enabled == val 1
 	{
-		sp_sc_flow_if text cvar ~ext == val "bsp"
+		// Time is up! The server is ready for slow downloads
+		sp_sc_cvar_copy ~filename #~1
+		sp_sc_cvar_split ~split "." ~filename
+		//last item
+		sp_sc_cvar_copy ~ext ~split_$~split_0
+		sp_sc_flow_if text cvar _http2_not_exist_local == val 1
 		{
-			// Bsp is always downloaded first, so indicates map wasn't in repo. (ignores .sp and extras)
-			// Or the time it took to http download was too long. ( rare case. )
-			sp_sc_cvar_sset ~text "[HTTP] Map " #_sp_cl_info_map ".zip _probably_ not in repo"
-			echo #~text
+			sp_sc_flow_if text cvar ~ext == val "bsp"
+			{
+				// Bsp is always downloaded first, so indicates map wasn't in repo. (ignores .sp and extras)
+				// Or the time it took to http download was too long. ( rare case. )
+				sp_sc_cvar_sset ~text "[HTTP] Map " #_sp_cl_info_map ".zip _probably_ not in repo"
+				echo #~text
+			}
+			else
+			{
+				// It doesn't request .bsp file thus download succeeded.
+				sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
+				echo #~text
+			}
+			// Only triggers once.
+			set _http2_not_exist_local 0	
 		}
-		else
-		{
-			// It doesn't request .bsp file thus download succeeded.
-			sp_sc_cvar_sset ~text "[HTTP] " #_sp_cl_info_map ".zip was downloaded."
-			echo #~text
-		}
-		// Only triggers once.
-		set _http2_not_exist_local 0	
 	}
 	
 }

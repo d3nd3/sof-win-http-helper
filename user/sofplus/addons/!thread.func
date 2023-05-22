@@ -1,0 +1,60 @@
+//Usage
+//thread_create 100 myloop loopref
+//thread_stop $loopref
+function thread_init()
+{
+	sp_sc_func_alias thread_create thread_create
+	sp_sc_func_alias thread_kill thread_kill
+	set threads_nonce 0
+}
+
+//If the thread need be stopped from the outside,supply a ret_cvar to store it.
+//This function creates a new thread, with a new nonce.
+function thread_create(~freq, ~callback,*)
+{
+	//_t_001_signal
+	sp_sc_cvar_sset ~signal _t_ $threads_nonce _ signal
+	set $~signal 1
+	
+	sp_sc_func_exec thread_loop $threads_nonce $~freq $~callback
+
+	sp_sc_flow_if number cvar ~0 > val 0
+	{
+		sp_sc_flow_if text cvar ~1 != val ""
+		{
+			//optional ret_cvar
+			set #~1 $threads_nonce
+		}
+	}
+	
+
+	add threads_nonce 1
+}
+//The nonce is the index into the 'cvars'.
+function thread_loop(~nonce,~freq,~callback)
+{
+
+	sp_sc_cvar_sset ~signal _t_ $~nonce _ signal
+	sp_sc_flow_if number cvar $~signal == val 1
+	{
+		//run their callback.
+		sp_sc_func_exec $~callback
+		sset ~cmd sp_sc_func_exec thread_loop $~nonce $~freq $~callback
+
+		//run this function again in X.
+		sp_sc_timer $~freq #~cmd
+	}
+}
+//Strong immutable signal - because we do not set signal to 1 anywhere else.
+function thread_kill(~nonce_cvar)
+{
+	sp_sc_cvar_copy ~nonce $~nonce_cvar
+	//Always one thread exists as old one is killed.
+	sp_sc_flow_if text cvar ~nonce != val ""
+	{
+		sp_sc_cvar_sset ~signal _t_ $~nonce _ signal
+		set $~signal 0
+		zero $~nonce_cvar
+	}
+	
+}

@@ -19,7 +19,7 @@ function http2_init()
 
 function http2_init_print()
 {
-	echo "[HTTP] Version v1.9 Loaded"
+	echo "[HTTP] Version v2.0 Loaded"
 }
 
 //2 -> 4 -> 7 -> 8

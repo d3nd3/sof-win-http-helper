@@ -20,7 +20,7 @@ Write-Host 'Keep this window open so that it can detect map change.'
 Write-Host 'SoF should open automatically now.'
 
 # Launch SoF - PassThru required to kill later.
-$gameProcess = Start-Process -PassThru -FilePath 'SoF.exe' -ArgumentList $arguments
+$gameProcess = Start-Process -PassThru -FilePath './SoF.exe' -ArgumentList $arguments
 
 While ($true) {
     If (Test-Path $AFile) {

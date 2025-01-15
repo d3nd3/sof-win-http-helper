@@ -1,16 +1,47 @@
 
-if ( $args -contains "disappear" ) {
-
 $arguments = $args[1..($args.Length - 1)]
 $ErrorActionPreference = 'Stop'
 # $ErrorActionPreference = 'Continue'
 
+$folderName = 'user'
+
+# Check if "user" is in the argument list
+if ($args -contains 'user') {
+    # Get the index of "user" in the argument list
+    $userIndex = $args.IndexOf('user')
+
+    # Check if there is an argument after "user"
+    if ($userIndex -lt $args.Length - 1) {
+        # Use the item to the right of "user" as the new folder name
+        $folderName = $args[$userIndex + 1]
+        Write-Host "Found 'user' in arguments. Using '$folderName' as folder name."
+    } else {
+        Write-Host "'user' found in arguments, but no value after it."
+    }
+} else {
+    # If "user" is not in the argument list, proceed with the folder existence check
+    #$exists = Get-ChildItem -Path (Split-Path $folderPath -Parent) | Where-Object { $_.Name -ieq 'User' }
+
+    if (Test-Path "./User") {
+        Write-Host "Folder 'User' exists."
+    $folderName = 'User'
+    } else {
+        # Folder doesn't exist, change the string to 'user'
+        #$folderName = 'user'
+        Write-Host "Folder 'User' does not exist. Defaulting to 'user'."
+    }
+}
+
+
+$AFile = "$folderName/sofplus/data/http_tmp"
 $HttpFile = ''
-$AFile = 'user\sofplus\data\http_tmp'
 $HttpServer = 'https://raw.githubusercontent.com/plowsof/sof1maps/main/'
+
 
 # Delete existing http file if it exists
 If (Test-Path "$AFile") {
+#If ( Get-ChildItem -Path (Get-Item $AFile).DirectoryName -Filter (Get-Item $AFile).Name -Force |
+ #         Where-Object { $_.Name -ieq (Get-Item $AFile).Name } ) {
     Remove-Item "$AFile"
     Write-Host 'Deleting existing http file.'
 }
@@ -19,11 +50,25 @@ Write-Host 'Welcome to SoF1 HTTP Auto Map Downloader.'
 Write-Host 'Keep this window open so that it can detect map change.'
 Write-Host 'SoF should open automatically now.'
 
+
+# can use LD_PRELOAD here eg.
+# Currenly forces vsync off
+$environmentVariables = @{
+    vblank_mode = '0'
+}
 # Launch SoF - PassThru required to kill later.
-$gameProcess = Start-Process -PassThru -FilePath './SoF.exe' -ArgumentList $arguments
+$arguments = @('SoF.exe') + $arguments
+$gameProcess = Start-Process -PassThru -FilePath 'wine' -ArgumentList $arguments -Environment $environmentVariables
+# Without gamemoderun...
+#$arguments = @('SoF.exe') + $arguments
+#$gameProcess = Start-Process -PassThru -FilePath 'wine' -ArgumentList $arguments
 
 While ($true) {
+
     If (Test-Path $AFile) {
+    #If ( Get-ChildItem -Path (Get-Item $AFile).DirectoryName -Filter (Get-Item $AFile).Name -Force |
+    #      Where-Object { $_.Name -ieq (Get-Item $AFile).Name } ) {
+
         # Read the last line of the mapname file
         $HttpFile = Get-Content "$AFile" | Select-Object -Last 1
         
@@ -34,7 +79,7 @@ While ($true) {
         $HttpFile = "$HttpFile" -replace '\.bsp$', '.zip'
 
         # Download the file from the http server
-        $DestFile = Join-Path 'user\maps' $HttpFile
+        $DestFile = Join-Path "$folderName/maps" $HttpFile
         
         # Create the directory if it doesn't exist
         $directory = Split-Path -LiteralPath "$DestFile"
@@ -51,7 +96,7 @@ While ($true) {
             Write-Host "SUCCESS: ""$HttpFile"" downloaded to ""$DestFile""."
 
             # Extract the zip file
-            Expand-Archive -LiteralPath "$DestFile" -DestinationPath 'user' -Force
+            Expand-Archive -LiteralPath "$DestFile" -DestinationPath "$folderName" -Force
 
             # Delete the zip file
             Remove-Item -LiteralPath "$DestFile"
@@ -69,13 +114,4 @@ While ($true) {
     if ($gameProcess.HasExited) {
         exit
     }
-}
-} else {
-    # $arguments = "-ExecutionPolicy Bypass", "-File `"$PSCommandPath`"", "disappear"
-    $arguments = "-WindowStyle Hidden","-ExecutionPolicy Bypass", "-File `"$PSCommandPath`"", "disappear"
-
-    if ($args -ne $null) {
-        $arguments += $args
-    }
-    Start-Process "powershell.exe" -ArgumentList $arguments
 }

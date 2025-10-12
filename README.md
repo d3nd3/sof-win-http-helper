@@ -4,7 +4,7 @@ Tired of manually downloading missing maps when joining a server? This utility i
 
 ## 🚀 Quick Start & Installation
 
-1.  **Extract:** Download the contents of this repository and extract all the files directly into your main **SoF installation folder** (where `SoF.exe` is located).
+1.  **Extract:** Download the contents of this repository or the release section .zip and extract all the files directly into your main **SoF installation folder** (where `SoF.exe` is located).
 2.  **Addon File:** Copy the provided `http2.func` file into your SoFPlus addon directory: `[SoF_Install]/User/sofplus/addons/`.
 3.  **Launch:** Use the new **`SoF_HTTP.cmd`** file to launch the game instead of your usual shortcut.
     * *Pro Tip:* Create a **desktop shortcut** to `SoF_HTTP.cmd` for easy access!
